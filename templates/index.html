@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>American Option Pricing Engine</title>
+    <!-- Include Chart.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        margin: 0;
+        padding: 30px;
+        background: #f1f5f9;
+        color: #1e293b;
+      }
+
+      .page-layout {
+        display: flex;
+        gap: 30px;
+        max-width: 1400px;
+        margin: auto;
+        align-items: flex-start;
+      }
+
+      .left-panel {
+        width: 420px;
+        flex-shrink: 0;
+        background: #ffffff;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow:
+          0 4px 6px -1px rgba(0, 0, 0, 0.1),
+          0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      }
+
+      .right-panel {
+        flex-grow: 1;
+        background: #ffffff;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow:
+          0 4px 6px -1px rgba(0, 0, 0, 0.1),
+          0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        min-height: 600px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+
+      h2 {
+        color: #0f172a;
+        margin-top: 0;
+        font-size: 20px;
+        border-bottom: 2px solid #f1f5f9;
+        padding-bottom: 12px;
+      }
+
+      .form-group {
+        margin-bottom: 14px;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 5px;
+        color: #475569;
+      }
+      input {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+      input:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
+      button {
+        background: #2563eb;
+        color: white;
+        border: none;
+        padding: 11px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 15px;
+        font-weight: 600;
+        width: 100%;
+        transition: background 0.2s;
+        margin-top: 8px;
+      }
+      button:hover {
+        background: #1d4ed8;
+      }
+
+      .results {
+        margin-top: 25px;
+        padding: 18px;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 8px;
+      }
+      .results h3 {
+        color: #166534;
+        margin-top: 0;
+        font-size: 16px;
+        margin-bottom: 12px;
+        border-bottom: 1px solid #dcfce7;
+        padding-bottom: 6px;
+      }
+      .results p {
+        font-size: 14px;
+        margin: 8px 0;
+        color: #14532d;
+        display: flex;
+        justify-content: space-between;
+      }
+      .results p strong {
+        color: #166534;
+      }
+
+      .placeholder-text {
+        color: #94a3b8;
+        text-align: center;
+        border: 2px dashed #cbd5e1;
+        width: 100%;
+        height: 550px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-layout">
+      <!-- Left Panel: Inputs & Results -->
+      <div class="left-panel">
+        <h2>Monte Carlo Option Pricer</h2>
+        <form method="POST">
+          <div class="form-group">
+            <label>Initial Stock Price (S₀)</label>
+            <input
+              type="number"
+              step="any"
+              name="S0"
+              value="{{ S0 }}"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label>Strike Price (K)</label>
+            <input type="number" step="any" name="K" value="{{ K }}" required />
+          </div>
+          <div class="form-group">
+            <label>Risk-Free Rate (r)</label>
+            <input type="number" step="any" name="r" value="{{ r }}" required />
+          </div>
+          <div class="form-group">
+            <label>Volatility (&sigma;)</label>
+            <input
+              type="number"
+              step="any"
+              name="sigma"
+              value="{{ sigma }}"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label>Time to Expiration (T in years)</label>
+            <input type="number" step="any" name="T" value="{{ T }}" required />
+          </div>
+          <div class="form-group">
+            <label>Simulated Paths</label>
+            <input
+              type="number"
+              name="n_paths"
+              value="{{ n_paths }}"
+              required
+            />
+          </div>
+          <button type="submit">Calculate Pricing</button>
+        </form>
+
+        {% if european_price is not none %}
+        <div class="results">
+          <h3>Calculation Results</h3>
+          <p>
+            <span>European Put:</span>
+            <strong>${{ "%.4f"|format(european_price) }}</strong>
+          </p>
+          <p>
+            <span>American Put:</span>
+            <strong>${{ "%.4f"|format(american_price) }}</strong>
+          </p>
+          <p>
+            <span>American Premium:</span>
+            <strong
+              >${{ "%.4f"|format(american_price - european_price) }}</strong
+            >
+          </p>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Right Panel: Dynamic Chart Workspace -->
+      <div class="right-panel">
+        {% if average_path != '[]' %}
+        <div style="width: 100%; height: 550px">
+          <canvas id="simulationChart"></canvas>
+        </div>
+        {% else %}
+        <div class="placeholder-text">
+          <h3 style="color: #64748b; margin-bottom: 8px">Sim price chart</h3>
+          <p style="font-size: 14px; margin: 0">
+            Run progran to generate and plot the simulated price paths here.
+          </p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if average_path != '[]' %}
+    <script>
+      const timeSteps = JSON.parse("{{ time_steps | safe }}");
+      const averagePath = JSON.parse("{{ average_path | safe }}");
+      const samplePaths = JSON.parse("{{ sample_paths | safe }}");
+
+      // Build datasets for Chart.js
+      let datasets = [];
+
+      // 1. Add background sample paths lightly
+      samplePaths.forEach((path, index) => {
+        datasets.push({
+          label: index === 0 ? "Sample Simulated Paths" : "",
+          data: path,
+          borderColor: "rgba(203, 213, 225, 0.4)", // Light slate grey
+          borderWidth: 1,
+          pointRadius: 0,
+          fill: false,
+          legend: { display: false },
+        });
+      });
+
+      // 2. Add the Bold Average Price Path on top
+      datasets.push({
+        label: "Average Stock Price Path",
+        data: averagePath,
+        borderColor: "#2563eb", // Vibrant Blue
+        borderWidth: 3,
+        pointRadius: 0,
+        fill: false,
+        zIndex: 1000,
+      });
+
+      const ctx = document.getElementById("simulationChart").getContext("2d");
+      const simulationChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: timeSteps,
+          datasets: datasets,
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              position: "top",
+              labels: {
+                filter: function (item) {
+                  // Only show the legend item for the average path to keep it clean
+                  return item.text === "Average Stock Price Path";
+                },
+              },
+            },
+            title: {
+              display: true,
+              text: "Simulated Price Trajectories",
+              font: { size: 16 },
+            },
+          },
+          scales: {
+            x: {
+              title: { display: true, text: "Time (Years)" },
+              grid: { display: false },
+            },
+            y: {
+              title: { display: true, text: "Asset Price ($)" },
+            },
+          },
+        },
+      });
+    </script>
+    {% endif %}
+  </body>
+</html>
